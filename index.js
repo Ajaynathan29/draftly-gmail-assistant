@@ -54,8 +54,9 @@ app.get('/sync-emails', async (req, res) => {
 
     // 1. Fetch Top Unread Email
     const response = await gmail.users.messages.list({ userId: 'me', q: 'is:unread', maxResults: 1 });
-    if (!response.data.messages) return res.status(200).json({ message: 'No new emails to sync.' });
-
+    if (!response.data.messages || response.data.messages.length === 0) {
+    return res.status(200).json({ message: "No new emails to sync." });
+}
     const msg = await gmail.users.messages.get({ 
         userId: 'me', id: response.data.messages[0].id, format: 'metadata', 
         metadataHeaders: ['Subject', 'From', 'Message-ID'] 
@@ -77,9 +78,9 @@ app.get('/sync-emails', async (req, res) => {
        const sentMsgs = await Promise.all(sentResponse.data.messages.map(m => 
            gmail.users.messages.get({ userId: 'me', id: m.id, format: 'minimal' })
        ));
-       styleContext = "Here are snippets of how I usually reply: " + sentMsgs.map(m => `"${m.data.snippet}"`).join(" | ");
-    }
-
+       const snippetsArray = sentMsgs.map(m => m.snippet);
+styleContext = "Here are snippets of how I usually reply:\n" + snippetsArray.join('\n');
+     }
     // 3. Generate Advanced Context Draft
     console.log('Generating AI Draft...');
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
@@ -99,8 +100,8 @@ app.get('/sync-emails', async (req, res) => {
     const dbResult = await pool.query(insertQuery, [from, subject, snippet, draftText, 'Pending Approval', threadId, messageId]);
 
     res.status(200).json({ message: 'Synced with Advanced AI Context!', data: dbResult.rows[0] });
-  } catch (error) { res.status(500).json({ error: error.message }); }
-});
+} catch (error) { res.status(500).json({ error: error.message }); }
+}); 
 
 // ==========================================
 // FEATURE B: REVIEW & APPROVAL APIs
