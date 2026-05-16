@@ -58,7 +58,7 @@ app.get('/sync-emails', async (req, res) => {
     return res.status(200).json({ message: "No new emails to sync." });
 }
     const msg = await gmail.users.messages.get({ 
-        userId: 'me', id: response.data.messages[0].id, format: 'metadata', 
+        userId: 'me', id: response.data.messages[0]?.id, format: 'metadata', 
         metadataHeaders: ['Subject', 'From', 'Message-ID'] 
     });
     
@@ -93,7 +93,12 @@ styleContext = "Here are snippets of how I usually reply:\n" + snippetsArray.joi
     Message: ${snippet}`;
 
     const aiResult = await model.generateContent(prompt);
-    const draftText = aiResult.response.text();
+
+if (!aiResult || !aiResult.response) {
+    throw new Error("Failed to generate content from AI model.");
+}
+
+const draftText = aiResult.response.text();
 
     // 4. Save to PostgreSQL
     const insertQuery = `INSERT INTO emails (sender, subject, snippet, ai_draft, status, thread_id, message_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;`;
@@ -149,7 +154,11 @@ app.post('/drafts/:id/send', async (req, res) => {
         ].join('\n');
 
         // Encode to base64url format
-        const base64EncodedEmail = Buffer.from(emailContent).toString('base64url');
+        const base64EncodedEmail = Buffer.from(emailContent)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 
         // 3. Send via Gmail
         const auth = await getAuthClient();
